@@ -12,8 +12,8 @@ already prices their tokenized peers — plus a working dashboard and a concrete
 
 ## The model (radar-2)
 
-Nothing is priced by hand and no protocol name is special-cased. Every figure is computed from the
-snapshot at run time:
+Nothing is priced by hand and no protocol name is special-cased in the pricing. Every figure is
+computed from the snapshot at run time. (Farm plans are a separate matter — see The board.)
 
 ```
 implied = TVL × multiple(category) × growth × maturity
@@ -37,9 +37,13 @@ growth and maturity multipliers), and the dashboard's detail view shows the full
   wrapped or staked products of a token that already trades.
 - Protocols whose token already trades are never ranked; the dashboard lists them separately at the
   market's own values — they are the comparables that price the board.
-- Each row's farm plan is derived from its record (category, chains, TVL, age): the category picks
-  the moves, the chains price the gas, a second chain earns its own step, and the protocol's age
-  sets the qualifying window. Every step states what it costs and how long it takes.
+- Each row's farm plan states what it costs and how long it takes. Most are derived from the row's
+  record (category, chains, TVL, age): the category picks the moves, the chains price the gas, a
+  second chain earns its own step, and the protocol's age sets the qualifying window. The
+  researched watchlist rows instead carry a hand-checked plan that names the protocol's real
+  vaults, points program or mint route, verified against its own site, docs or app — a curator's
+  actual Morpho or Kamino vaults, Veda's points dashboard, USDD's mint-and-Earn route. A protocol
+  whose route could not be verified keeps the derived plan rather than an invented one.
 
 ## The dashboard
 
