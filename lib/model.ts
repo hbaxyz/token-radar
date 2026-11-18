@@ -501,12 +501,270 @@ function actionsFor(p: SnapshotProtocol, capital: number, chain: string): { open
 }
 
 /**
- * A protocol's farm plan: five to seven steps, each an action with a cost and a time. The plan is
- * derived from the protocol's own record (category, chains, TVL, age), never from a hand-written
- * list of names: the category picks the two moves, the first chain prices the gas, a second chain
- * earns its own step, and the protocol's age sets the qualifying window.
+ * Hand-checked farm plans for the watchlist rows whose real product could be verified against the
+ * protocol's own site, docs or app (researched November 2026). The valuation above never reads
+ * this table — pricing stays fully computed from the snapshot — but a farm plan is advice, and
+ * advice that names the wrong vault is worse than a generic plan, so where a protocol's actual
+ * vaults, points program or mint mechanism are public, the plan names them. Rows without an entry
+ * here keep the derived category plan below; a protocol whose route could not be verified (Hive
+ * Protocol's identity, for one) gets no entry rather than an invented one.
+ */
+const FARM_OVERRIDES: Record<string, FarmStep[]> = {
+  'steakhouse-financial': [
+    {
+      text: "Fund a wallet with USDC and a little ETH for gas, then open the Morpho app's vault list and pick a Steakhouse Financial vault: deposits sit in Morpho contracts and Steakhouse only curates the vault's markets",
+      cost: 'under $3 to fund, gas about $6 on Ethereum or cents on Base',
+      time: '10 minutes',
+    },
+    {
+      text: 'Deposit $150 of USDC into Steakhouse Prime USDC, the conservative family whose collateral is blue-chip, and keep the vault shares in the wallet; the High Yield family takes broader collateral for a higher rate',
+      cost: '$150 of capital, one deposit of gas',
+      time: '15 minutes to set up',
+    },
+    {
+      text: 'Open a second, smaller position in Steakhouse High Yield USDC on Arbitrum and compare the two vaults\' APY breakdowns before adding more to either',
+      cost: 'about $50 more capital, gas about $0.20 on Arbitrum',
+      time: '15 minutes',
+    },
+    {
+      text: 'Hold both positions across the window: the Prime and High Yield vaults have no deposit lockup, but withdrawals depend on market liquidity, and Steakhouse\'s Term vaults instead run to a fixed maturity, so check the vault page before using one',
+      cost: 'the capital stays deployed for the window',
+      time: '45 days, 5 minutes a week',
+    },
+    {
+      text: 'Expect no points: Steakhouse runs no points program, so the lending yield is the whole return. Log every deposit hash and set the exit now: withdraw after a full quarter of compounding, or sooner if the vault\'s collateral list changes',
+      cost: 'nothing but the note',
+      time: '5 minutes',
+    },
+  ],
+  gauntlet: [
+    {
+      text: 'Fund a wallet with USDC and gas on Arbitrum, then open Gauntlet\'s vault list in the Morpho app: its vaults are organised by mandate — Prime takes blue-chip collateral only, Balanced mixes in higher-yield markets, Frontier chases maximum yield on mid-cap collateral',
+      cost: 'under $3 to fund, gas about $0.20 on Arbitrum',
+      time: '10 minutes',
+    },
+    {
+      text: 'Deposit $150 of USDC into Gauntlet USDC Balanced on Morpho and keep the vault shares; stay in the Prime or Balanced mandates unless the Frontier risk is a deliberate choice',
+      cost: '$150 of capital, one deposit of gas',
+      time: '15 minutes to set up',
+    },
+    {
+      text: 'Add a second position in a Gauntlet vault on Kamino, its Solana line, depositing USDC there so the farm spans both of the curator\'s platforms',
+      cost: 'about $50 of capital, gas under $0.10 on Solana',
+      time: '15 minutes',
+    },
+    {
+      text: 'Hold across the window and re-check the mandate\'s market list monthly: a curator vault\'s risk is the markets it lends into, and Gauntlet rebalances them as conditions change',
+      cost: 'the capital stays deployed for the window',
+      time: '45 days, 5 minutes a week',
+    },
+    {
+      text: 'Expect no points: Gauntlet has no token and no points program, so lending yield is the whole return. Log every hash and exit by withdrawing to USDC once the window closes',
+      cost: 'nothing but the note',
+      time: '5 minutes',
+    },
+  ],
+  'nonce-capital': [
+    {
+      text: 'Fund a wallet with ETH-side assets and gas on Ethereum: Nonce Capital has no retail app of its own — it curates yield strategies for ether.fi on Veda\'s vault infrastructure, so the farm runs through ether.fi\'s app, not a Nonce page',
+      cost: 'under $3 to fund, gas about $6 on Ethereum',
+      time: '10 minutes',
+    },
+    {
+      text: 'Deposit $100 into an ether.fi Liquid vault from its ETH, BTC or USD line, the product family Nonce curates strategies for, and keep the Liquid vault tokens in the wallet',
+      cost: '$100 of capital, one deposit of gas',
+      time: '15 minutes to set up',
+    },
+    {
+      text: 'Read the vault\'s own page for its curator and strategy notes before adding more: which Liquid vaults Nonce curates is disclosed only in general terms, so size the position as an ether.fi position, not a Nonce one',
+      cost: 'nothing to read',
+      time: '10 minutes',
+    },
+    {
+      text: 'Hold the Liquid tokens across the window and claim whatever the position accrues from ether.fi\'s own rewards page, never from a link in a message or a search ad',
+      cost: 'the capital stays deployed for the window',
+      time: '45 days, 5 minutes a week',
+    },
+    {
+      text: 'Expect no Nonce points: any points on this position belong to ether.fi\'s or Veda\'s programs, not to Nonce. Log every hash and exit by redeeming the Liquid tokens when the window closes',
+      cost: 'nothing but the note',
+      time: '5 minutes',
+    },
+  ],
+  rockawayx: [
+    {
+      text: 'Fund a wallet with USDC and ETH gas, then open the Morpho vault list filtered to RockawayX: its public line is rxUSDCp (Prime), rxUSDCy (Yield) and a wETH vault on Ethereum, plus an RWA vault on Kamino',
+      cost: 'under $3 to fund, gas about $6 on Ethereum',
+      time: '10 minutes',
+    },
+    {
+      text: 'Deposit $100 of USDC into RockawayX USDC Prime, rxUSDCp, which lends against cbBTC, WBTC and wstETH at a 0% performance fee, and keep the vault token in the wallet',
+      cost: '$100 of capital, one deposit of gas',
+      time: '15 minutes to set up',
+    },
+    {
+      text: 'Add a smaller position in USDC Yield, rxUSDCy, whose markets include RWA-backed collateral such as Maple\'s syrupUSDC, at a 5% performance fee, and compare the two vaults\' yields monthly',
+      cost: 'about $50 more capital, one deposit of gas',
+      time: '15 minutes',
+    },
+    {
+      text: 'Optionally repeat a small version on Solana: deposit USDC into the RockawayX RWA Vault on Kamino, which allocates across OnRe, Huma, Figure and Solstice. Skip the Tori predeposit vault unless a lockup until its phase transition is acceptable',
+      cost: 'about $25 of capital, gas under $0.10 on Solana',
+      time: '15 minutes',
+    },
+    {
+      text: 'Expect no RockawayX points: the yield is the return, and the points the Tori vault quotes belong to Tori. Log every hash and exit by withdrawing from each vault when the window closes',
+      cost: 'nothing but the note',
+      time: '5 minutes',
+    },
+  ],
+  veda: [
+    {
+      text: 'Fund a wallet with ETH-side assets and gas, then open the Veda Points dashboard on Veda\'s own site: Veda is vault infrastructure (its BoringVault design powers products such as ether.fi Liquid and Lombard\'s DeFi Vault), and the dashboard lists which activities currently earn Veda Points',
+      cost: 'under $3 to fund, gas about $6 on Ethereum',
+      time: '10 minutes',
+    },
+    {
+      text: 'Deposit $150 into a qualifying Veda-powered vault from that list — the documented example is Lombard\'s DeFi Vault — and keep the vault token (LBTCv for the Lombard vault) in the wallet',
+      cost: '$150 of capital, one deposit of gas',
+      time: '15 minutes to set up',
+    },
+    {
+      text: 'Check the dashboard monthly and stay in listed activities only: points accrue while the position sits in a qualifying vault, and a vault that leaves the list stops earning',
+      cost: 'nothing to check',
+      time: '10 minutes a month',
+    },
+    {
+      text: 'Hold the position across the whole window rather than rotating weekly: the program rewards sustained participation, and US users are restricted from the points campaign, so confirm eligibility on the dashboard first',
+      cost: 'the capital stays deployed for the window',
+      time: '60 days, 5 minutes a week',
+    },
+    {
+      text: 'Log the wallet, the vault and every hash, and set the exit now: unwind when Veda\'s token launches and any claim is live on Veda\'s own site, or after the window with no announcement. A claim that asks for a fee or a blind approval is a scam',
+      cost: 'nothing but the note',
+      time: '5 minutes',
+    },
+  ],
+  usdd: [
+    {
+      text: 'Fund a wallet with ETH and gas on Ethereum, then open USDD\'s own app at app.usdd.io/eth: USDD is the TRON DAO Reserve\'s over-collateralised stablecoin, issued against collateral in its ETH Vault and WBTC Vault',
+      cost: 'under $3 to fund, gas about $6 on Ethereum',
+      time: '10 minutes',
+    },
+    {
+      text: 'Deposit ETH as collateral in the ETH Vault and mint about $150 of USDD against it, keeping the collateral ratio comfortably above the liquidation line the vault shows',
+      cost: 'the ETH collateral, one mint of gas',
+      time: '15 minutes to set up',
+    },
+    {
+      text: 'Deposit the minted USDD into USDD Earn and hold the sUSDD receipt: Earn pays the protocol\'s savings rate (about 4% base APY in its recent reporting) with no lockup, so the position can be unwound at any time',
+      cost: 'one deposit of gas',
+      time: '10 minutes',
+    },
+    {
+      text: 'Check the collateral ratio weekly and top the vault up if ETH falls: a CDP position is worked by defending its liquidation price, not by adding more debt',
+      cost: 'the capital stays deployed for the window',
+      time: '30 days, 5 minutes a week',
+    },
+    {
+      text: 'Expect no points and no airdrop: USDD is already the token, so the Earn rate is the whole return. Log every hash and exit by repaying the mint and withdrawing the collateral, or by redeeming sUSDD back to USDD',
+      cost: 'nothing but the note',
+      time: '5 minutes',
+    },
+  ],
+  hyperithm: [
+    {
+      text: 'Fund a wallet with USDC on Solana and a little SOL for gas: Hyperithm is a Tokyo and Seoul asset manager whose onchain line is curator vaults, and its most accessible one is the Hyperithm USDC Apex Vault on Kamino',
+      cost: 'under $3 to fund, gas under $0.10 on Solana',
+      time: '10 minutes',
+    },
+    {
+      text: 'Deposit $100 of USDC into the USDC Apex Vault on Kamino and keep the vault shares in the wallet; the vault lends the USDC out under Hyperithm\'s market-neutral management',
+      cost: '$100 of capital, one deposit of gas',
+      time: '15 minutes to set up',
+    },
+    {
+      text: 'Optionally open the Monad side instead or as well: Hyperithm\'s vault on Accountable\'s YieldApp takes USDC and issues the aHYPER share token, which also serves as collateral in Morpho markets on Monad',
+      cost: 'about $50 of capital, gas about $0.40 on Monad',
+      time: '15 minutes',
+    },
+    {
+      text: 'Hold across the window and check the vault page before adding more: the lockup and withdrawal terms are set per vault and are not stated in Hyperithm\'s public materials, so confirm them in the app first',
+      cost: 'the capital stays deployed for the window',
+      time: '45 days, 5 minutes a week',
+    },
+    {
+      text: 'Expect no points: no Hyperithm points program is public, so the strategy yield is the whole return. Log every hash and exit by withdrawing from the vault when the window closes',
+      cost: 'nothing but the note',
+      time: '5 minutes',
+    },
+  ],
+  'k3-capital': [
+    {
+      text: 'Fund a wallet with the deposit asset and gas on Ethereum: K3 Capital is a delta-neutral fund that also runs public vaults through its app, routing deposits into strategies on venues such as Liquity, Morpho and Euler',
+      cost: 'under $3 to fund, gas about $6 on Ethereum',
+      time: '10 minutes',
+    },
+    {
+      text: 'Deposit BOLD into K3\'s sBold vault, which directs the BOLD into Liquity v2\'s stability pool to earn liquidation gains, or deposit USDT into one of its Earn vaults if BOLD is not to hand, and keep the receipt tokens',
+      cost: '$100 of capital, one deposit of gas',
+      time: '15 minutes to set up',
+    },
+    {
+      text: 'Verify the vault\'s terms inside the live app before adding more: K3\'s public Q&A describes the vaults, but the per-vault lockup and fee terms are the ones the app shows at deposit time',
+      cost: 'nothing to read',
+      time: '10 minutes',
+    },
+    {
+      text: 'Hold the receipt tokens across the window and re-check the strategy allocation monthly: a routing vault\'s yield follows the venues underneath it, and K3 moves allocations as rates change',
+      cost: 'the capital stays deployed for the window',
+      time: '45 days, 5 minutes a week',
+    },
+    {
+      text: 'Expect no token points: K3\'s own Q&A says it has no publicly traded governance token, so the vault yield is the whole return. Log every hash and exit by withdrawing from the vault when the window closes',
+      cost: 'nothing but the note',
+      time: '5 minutes',
+    },
+  ],
+  clearstar: [
+    {
+      text: 'Fund a wallet with USDC and gas on Base, then open the Morpho vault list filtered to Clearstar: its vaults (the Clearstar Labs brand, operated by NovaFusion SA) come in Core, Reactor and Boring families across Base, Arbitrum and Katana',
+      cost: 'under $3 to fund, gas about $0.15 on Base',
+      time: '10 minutes',
+    },
+    {
+      text: 'Deposit $100 of USDC into Clearstar Boring USDC on Base, the conservative family at a 0% performance fee, and keep the vault shares in the wallet',
+      cost: '$100 of capital, one deposit of gas',
+      time: '15 minutes to set up',
+    },
+    {
+      text: 'For the one real incentive angle in this row, open Clearstar Core USDC on Katana instead or as well: its published APY includes KAT token rewards on top of the lending rate, unlike Clearstar\'s own points, which do not exist',
+      cost: 'about $50 more capital, gas about $0.40 on Katana',
+      time: '15 minutes',
+    },
+    {
+      text: 'Hold across the window and compare families before adding more: the Reactor vaults take a 20% performance fee for higher-yield markets, and parameter changes sit behind timelocks of days, so a vault\'s terms cannot change overnight',
+      cost: 'the capital stays deployed for the window',
+      time: '45 days, 5 minutes a week',
+    },
+    {
+      text: 'Log every deposit hash and set the exit now: withdraw to USDC when the window closes, and claim any KAT rewards only from Katana\'s or Morpho\'s own pages, never from a link in a message',
+      cost: 'nothing but the note',
+      time: '5 minutes',
+    },
+  ],
+};
+
+/**
+ * A protocol's farm plan: five to seven steps, each an action with a cost and a time. Watchlist
+ * rows with a verified product use the hand-checked plan in FARM_OVERRIDES above. Every other
+ * plan is derived from the protocol's own record (category, chains, TVL, age): the category picks
+ * the two moves, the first chain prices the gas, a second chain earns its own step, and the
+ * protocol's age sets the qualifying window.
  */
 export function farmSteps(p: SnapshotProtocol, age: number | null): FarmStep[] {
+  const override = FARM_OVERRIDES[p.slug];
+  if (override !== undefined) return override.map((s) => ({ ...s }));
   // A bridge's working chain is the far side, not Ethereum; every other protocol works on its first chain.
   const isBridge = (p.category ?? '').toLowerCase().includes('bridge');
   const chain = isBridge
